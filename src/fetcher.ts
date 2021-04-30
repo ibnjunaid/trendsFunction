@@ -1,21 +1,12 @@
 import axios from 'axios';
-// import mongoose = require("mongoose");
-import * as mongoose from "mongoose";
-
-import { frontEndResponse, Trend, trend, twitterResponse } from './Commons/interfaces';
-import { responseSchema } from './Trend.Model'
-import { databaseName } from './Commons/Configs';
-import { findPlaceByWoeid, replaceSpaceAndDotsWith_ } from './Commons/Woeid-methods';
+import { frontEndResponse, Trend, trend, twitterResponse } from './utils/interfaces';
+import { trendModel } from './Trend.Model'
 
 
-export async function fetchAndSaveTrends(Woeid:number,conn: Promise<typeof import("mongoose")>,Token:String) {
+export async function fetchAndSaveTrends(Woeid:number,Token:String) {
     try {
         //Set Twitter API token Here 
         axios.defaults.headers.common['Authorization'] = Token; 
-
-        const mongoConn = await conn;
-        //Switch to trends databaseName
-        mongoConn.connection.useDb(databaseName);
 
         //fetch and parse data
         const responseData = await getTrendsByCountry(Woeid);
@@ -23,32 +14,25 @@ export async function fetchAndSaveTrends(Woeid:number,conn: Promise<typeof impor
         //if responseData is returned, implies that the woeid exist 
         if(responseData) {
 
-            //find the place by Woeid
-            const match  = findPlaceByWoeid(Woeid);
-            //Replace spaces with _ so that it can be used for collection naming;
-            const place = replaceSpaceAndDotsWith_(match?.name||'');
-
-            //Create a model for that place   
-            const trendModel = mongoose.model(place,responseSchema,place);
-
             // Add data to that model
             const trendresponseData = new trendModel({
                 trends : responseData?.trends,
                 as_of : responseData?.as_of,
-                locations : responseData?.location
+                woeid: responseData.location[0].woeid,
+                name : responseData.location[0].name                
             });
         
             // Save the model to the databaseName
             const savedDoc = await trendresponseData.save();
 
             if (savedDoc){
-                // console.log(`Data Saved with id : ${savedDoc._id} in ${savedDoc.collection.name} at ${new Date()}`);
+                console.log(`Data Saved with id : ${savedDoc._id} in ${savedDoc.collection.name} at ${new Date()}`);
                 return({ id : savedDoc._id  ,collection: savedDoc.collection.name,  date: new Date() });
             }
     }
         
     }catch (error) {
-        console.error(error);   
+        throw error;
     }
     
 }
@@ -65,14 +49,19 @@ async function getTrendsByCountry(woeid:number){
         return parseResponse(response.data[0]);
     }
     catch (err) {
-        console.error(err);
+        if(err?.response.status === 400){
+            console.error('Invalid token ')
+        } else if( err?.response.status === 429){
+            console.error('Too Many request try to handle Rate limit');
+        }
+        throw err;
     }
 }
 
 
 function parseResponse(responseData:twitterResponse){
     const Response : frontEndResponse = {
-        trends : responseData.trends.map((d,i) => parseTrend(d,i)).filter((d) => d.index < 11),
+        trends : responseData.trends.map((d,i) => parseTrend(d,i)),
         as_of : responseData.as_of,
         location : responseData.locations
     }

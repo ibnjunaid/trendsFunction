@@ -1,24 +1,27 @@
+import axios from "axios";
 import mongoose = require("mongoose");
 import {fetchAndSaveTrends} from './fetcher';
-import woeidList from './data/WOEID.json';
-import { Params } from "./Commons/interfaces";
+import { Params } from "./utils/interfaces";
 
 
-export default function main(params:Params){
-    const conn = mongoose.connect(params.URI,{useNewUrlParser:true,useUnifiedTopology:true});
-    const token = params.TWITTER_TOKEN
-    const start = params.START
-    const end = params.END;
-    return distributeWork(conn,token,start,end).then((d)=>{
-        return {body: d };
-    })
+export default async function main(params:Params){
+    try {
+        let woeidList = (await (await axios.get('https://trendsend.herokuapp.com/place/get-all-places')).data).places ;
+        woeidList = woeidList.slice(params.START,params.END)
+        mongoose.connect(params.URI,{useNewUrlParser:true,useUnifiedTopology:true});
+        const d = await distributeWork(params.TWITTER_TOKEN,  woeidList);
+        console.log("Done");
+        return { error: null, body: d };   
+    } catch (error) {
+        return {error : error, body: null};
+    }
 }
 
-async function distributeWork(conn: Promise<typeof mongoose>,token: String,start: number,end:number){
+async function distributeWork(token: String,woeidList){
     return Promise.all(
-        woeidList.filter((_,i) => i >= start && i < end).map(async(d,_)=> await fetchAndSaveTrends(d.woeid,conn,token))
+        woeidList.map(async(d,_)=> await fetchAndSaveTrends(d.woeid,token))
     )
 }
-
+ 
 const globalAny : any = global;
-globalAny.main = main
+globalAny.main = main 

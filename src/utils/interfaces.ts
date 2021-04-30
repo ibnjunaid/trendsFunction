@@ -47,7 +47,6 @@ export interface frontEndResponse{
 export interface Params{
     URI: string;
     TWITTER_TOKEN: string;
-    LIMIT ?: any; 
     START :number,
     END : number
 } 
