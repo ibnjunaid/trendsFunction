@@ -1,0 +1,1 @@
+ibmcloud fn action create ritikh --docker ibnjunaid/trends-action -P params.json ../dist/bundle.js --main global.main --web true

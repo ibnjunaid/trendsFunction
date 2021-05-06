@@ -10,10 +10,10 @@ export default async function main(params:Params){
         woeidList = woeidList.slice(params.START,params.END)
         mongoose.connect(params.URI,{useNewUrlParser:true,useUnifiedTopology:true});
         const d = await distributeWork(params.TWITTER_TOKEN,  woeidList);
-        console.log("Done");
-        return { error: null, body: d };   
+        return { body: d , statusCode : 200};   
     } catch (error) {
-        return {error : error, body: null};
+        console.log(error)
+        return {body : error.message, statusCode : 500};
     }
 }
 
